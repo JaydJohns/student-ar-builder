@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Builder - Group Workspace</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            color: #fff;
+        }
+
+        #container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        #groupTitle {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        #scene-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        a-scene {
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-panel {
+            background: rgba(15, 23, 42, 0.95);
+            padding: 15px;
+            border-top: 2px solid #667eea;
+            max-height: 180px;
+            overflow-y: auto;
+            box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        #controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #3b4565;
+        }
+
+        .btn-secondary:hover {
+            background: #4a5580;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        #asset-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .asset-btn {
+            background: #3b4565;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+
+        .asset-btn:hover {
+            background: #4a5580;
+        }
+
+        #info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        #info strong {
+            color: #fbbf24;
+        }
+
+        #camera-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        @media (max-width: 768px) {
+            #groupTitle {
+                font-size: 18px;
+            }
+
+            button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            #ui-panel {
+                max-height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <div id="groupTitle">Group Workspace</div>
+            <div style="display: flex; gap: 10px;">
+                <button id="exportBtn" class="btn-success">📤 Export Scene</button>
+                <button id="clearBtn" class="btn-danger">🗑️ Clear All</button>
+            </div>
+        </div>
+
+        <div id="scene-container">
+            <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+                <a-camera position="0 1.6 0" wasd-controls look-controls></a-camera>
+                <a-light type="ambient" intensity="0.8" color="#ffffff"></a-light>
+                <a-light type="directional" intensity="0.6" position="5 10 5" color="#ffffff"></a-light>
+                <a-plane position="0 0 -4" rotation="-90 0 0" width="20" height="20" color="#4a5580" opacity="0.3"></a-plane>
+                <a-entity id="objects-container"></a-entity>
+            </a-scene>
+            <div id="camera-info">📱 Drag objects to move | Scroll to rotate view</div>
+        </div>
+
+        <div id="ui-panel">
+            <div id="controls">
+                <div>
+                    <strong style="font-size: 13px;">Add Objects:</strong>
+                </div>
+                <div id="asset-buttons">
+                    <button class="asset-btn" onclick="addObject('box', '#e74c3c')">📦 Box</button>
+                    <button class="asset-btn" onclick="addObject('sphere', '#3498db')">⚪ Sphere</button>
+                    <button class="asset-btn" onclick="addObject('cylinder', '#f39c12')">🔶 Cylinder</button>
+                    <button class="asset-btn" onclick="addObject('cone', '#9b59b6')">🔺 Cone</button>
+                    <button class="asset-btn" onclick="addObject('plane', '#1abc9c')">📄 Plane</button>
+                    <button class="asset-btn" onclick="addObject('dodecahedron', '#e67e22')">🔷 Dodeca</button>
+                </div>
+            </div>
+            <button id="arBtn" class="btn-success">🥽 View in AR</button>
+            <button class="btn-secondary" onclick="downloadScene()">⬇️ Download Scene Data</button>
+            <div id="info">
+                <strong>Group:</strong> <span id="groupNum">1</span> | 
+                <strong>Objects:</strong> <span id="objectCount">0</span> | 
+                <strong>Tip:</strong> Click and drag objects to move them
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const scene = document.querySelector('a-scene');
+        const objectsContainer = document.getElementById('objects-container');
+        let objects = [];
+        let selectedObject = null;
+        let isDragging = false;
+        let dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        const intersectPoint = new THREE.Vector3();
+
+        const params = new URLSearchParams(window.location.search);
+        const groupId = params.get('group') || '1';
+        document.getElementById('groupNum').textContent = groupId;
+        document.getElementById('groupTitle').textContent = `Group ${groupId} - AR Builder`;
+
+        function addObject(type, color) {
+            const id = `obj-${Date.now()}`;
+            const entity = document.createElement('a-entity');
+            entity.id = id;
+            entity.setAttribute('class', 'draggable-object');
+            entity.setAttribute('position', `${Math.random() * 4 - 2} ${1 + Math.random() * 2} ${-3 - Math.random() * 2}`);
+            entity.setAttribute(type, '');
+            entity.setAttribute('color', color);
+            entity.setAttribute('scale', '0.8 0.8 0.8');
+            entity.setAttribute('data-type', type);
+            entity.setAttribute('data-color', color);
+            objectsContainer.appendChild(entity);
+            objects.push({ id, type, color, element: entity });
+            updateObjectCount();
+        }
+
+        document.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON' || event.target.closest('button')) return;
+            
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            const camera = scene.camera;
+            raycaster.setFromCamera(mouse, camera);
+            
+            const draggables = objectsContainer.querySelectorAll('.draggable-object');
+            const intersects = raycaster.intersectObjects(
+                Array.from(draggables).map(d => d.object3D.children[0] || d.object3D),
+                true
+            );
+            
+            if (intersects.length > 0) {
+                selectedObject = intersects[0].object.el || intersects[0].object.parent.el;
+                isDragging = true;
+                selectedObject.setAttribute('scale', '0.95 0.95 0.95');
+            } else {
+                selectedObject = null;
+            }
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (!isDragging || !selectedObject) return;
+            
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            const camera = scene.camera;
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(dragPlane, intersectPoint);
+            
+            const pos = selectedObject.getAttribute('position');
+            selectedObject.setAttribute('position', {
+                x: intersectPoint.x,
+                y: pos.y,
+                z: intersectPoint.z
+            });
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (selectedObject) {
+                selectedObject.setAttribute('scale', '0.8 0.8 0.8');
+            }
+            isDragging = false;
+            selectedObject = null;
+        });
+
+        document.addEventListener('touchstart', (event) => {
+            const touch = event.touches[0];
+            const clickEvent = new MouseEvent('click', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            document.dispatchEvent(clickEvent);
+        });
+
+        document.addEventListener('touchmove', (event) => {
+            if (!isDragging || !selectedObject) return;
+            const touch = event.touches[0];
+            const moveEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            document.dispatchEvent(moveEvent);
+        });
+
+        document.addEventListener('touchend', (event) => {
+            const endEvent = new MouseEvent('mouseup', {});
+            document.dispatchEvent(endEvent);
+        });
+
+        function updateObjectCount() {
+            document.getElementById('objectCount').textContent = objects.length;
+        }
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Clear all objects? This cannot be undone.')) {
+                objectsContainer.innerHTML = '';
+                objects = [];
+                updateObjectCount();
+            }
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const sceneData = objects.map(obj => {
+                const pos = obj.element.getAttribute('position');
+                const scale = obj.element.getAttribute('scale');
+                return {
+                    type: obj.type,
+                    color: obj.color,
+                    position: pos,
+                    scale: scale
+                };
+            });
+
+            const encoded = btoa(JSON.stringify(sceneData));
+            const shareUrl = `${window.location.href.split('?')[0]}?group=${groupId}&scene=${encoded}`;
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = shareUrl;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            alert('Scene link copied to clipboard!\\n\\n' + shareUrl);
+        });
+
+        function downloadScene() {
+            const sceneData = objects.map(obj => {
+                const pos = obj.element.getAttribute('position');
+                const scale = obj.element.getAttribute('scale');
+                return {
+                    type: obj.type,
+                    color: obj.color,
+                    position: pos,
+                    scale: scale
+                };
+            });
+
+            const dataStr = JSON.stringify(sceneData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `group-${groupId}-scene.json`;
+            link.click();
+        }
+
+        function loadSceneFromUrl() {
+            const sceneParam = params.get('scene');
+            if (sceneParam) {
+                try {
+                    const sceneData = JSON.parse(atob(sceneParam));
+                    sceneData.forEach(obj => {
+                        const id = `obj-${Date.now()}-${Math.random()}`;
+                        const entity = document.createElement('a-entity');
+                        entity.id = id;
+                        entity.setAttribute('class', 'draggable-object');
+                        entity.setAttribute('position', obj.position);
+                        entity.setAttribute(obj.type, '');
+                        entity.setAttribute('color', obj.color);
+                        entity.setAttribute('scale', obj.scale);
+                        entity.setAttribute('data-type', obj.type);
+                        entity.setAttribute('data-color', obj.color);
+                        objectsContainer.appendChild(entity);
+                        objects.push({ id, type: obj.type, color: obj.color, element: entity });
+                    });
+                    updateObjectCount();
+                } catch (e) {
+                    console.error('Failed to load scene:', e);
+                }
+            }
+        }
+
+        document.getElementById('arBtn').addEventListener('click', () => {
+            if (scene.is('ar-mode')) {
+                scene.exitAR();
+                document.getElementById('arBtn').textContent = '🥽 View in AR';
+            } else {
+                scene.enterAR();
+                document.getElementById('arBtn').textContent = '🏠 Exit AR';
+            }
+        });
+
+        scene.addEventListener('loaded', () => {
+            loadSceneFromUrl();
+        });
+    </script>
+</body>
+</html>
