@@ -241,8 +241,14 @@
             };
 
             entity.setAttribute('position', position);
-            entity.setAttribute(type, '');
-            entity.setAttribute('color', color);
+            entity.setAttribute('geometry', {
+                primitive: type,
+                radius: type === 'sphere' ? 0.5 : undefined,
+                height: type === 'cylinder' || type === 'cone' ? 1 : undefined,
+                radiusBottom: type === 'cone' ? 0.5 : undefined,
+                radiusTop: type === 'cone' ? 0.1 : undefined
+            });
+            entity.setAttribute('material', {color: color});
             entity.setAttribute('scale', '1.2 1.2 1.2');
             entity.setAttribute('data-type', type);
             entity.setAttribute('data-color', color);
@@ -402,8 +408,14 @@
                         entity.id = id;
                         entity.setAttribute('class', 'draggable-object');
                         entity.setAttribute('position', obj.position);
-                        entity.setAttribute(obj.type, '');
-                        entity.setAttribute('color', obj.color);
+                        entity.setAttribute('geometry', {
+                            primitive: obj.type,
+                            radius: obj.type === 'sphere' ? 0.5 : undefined,
+                            height: obj.type === 'cylinder' || obj.type === 'cone' ? 1 : undefined,
+                            radiusBottom: obj.type === 'cone' ? 0.5 : undefined,
+                            radiusTop: obj.type === 'cone' ? 0.1 : undefined
+                        });
+                        entity.setAttribute('material', {color: obj.color});
                         entity.setAttribute('scale', obj.scale);
                         entity.setAttribute('data-type', obj.type);
                         entity.setAttribute('data-color', obj.color);
