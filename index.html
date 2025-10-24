@@ -180,9 +180,10 @@
 
         <div id="scene-container">
             <a-scene embedded>
-                <a-camera position="0 1.6 0" wasd-controls look-controls></a-camera>
-                <a-light type="ambient" intensity="0.8" color="#ffffff"></a-light>
-                <a-light type="directional" intensity="0.6" position="5 10 5" color="#ffffff"></a-light>
+                <a-camera position="0 1.6 3" rotation="0 0 0" wasd-controls look-controls></a-camera>
+                <a-light type="ambient" intensity="1.0" color="#ffffff"></a-light>
+                <a-light type="directional" intensity="0.8" position="5 10 7" color="#ffffff"></a-light>
+                <a-light type="point" intensity="0.5" position="0 3 0" color="#ffffff"></a-light>
                 <a-plane position="0 0 -4" rotation="-90 0 0" width="20" height="20" color="#4a5580" opacity="0.3"></a-plane>
                 <a-entity id="objects-container"></a-entity>
             </a-scene>
@@ -235,14 +236,14 @@
 
             const position = {
                 x: Math.random() * 4 - 2,
-                y: 1 + Math.random() * 2,
-                z: -3 - Math.random() * 2
+                y: 1.5 + Math.random() * 1.5,
+                z: -2 - Math.random() * 3
             };
 
             entity.setAttribute('position', position);
             entity.setAttribute(type, '');
             entity.setAttribute('color', color);
-            entity.setAttribute('scale', '0.8 0.8 0.8');
+            entity.setAttribute('scale', '1.2 1.2 1.2');
             entity.setAttribute('data-type', type);
             entity.setAttribute('data-color', color);
 
@@ -250,7 +251,7 @@
             objects.push({ id, type, color, element: entity });
             updateObjectCount();
 
-            console.log(`Added ${type} at position:`, position);
+            console.log(`Added ${type} at position:`, position, 'Camera should see it!');
         }
 
         document.addEventListener('click', (event) => {
