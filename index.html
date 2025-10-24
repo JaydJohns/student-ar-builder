@@ -179,7 +179,7 @@
         </div>
 
         <div id="scene-container">
-            <a-scene embedded>
+            <a-scene embedded vr-mode-ui="enabled: false" webxr="requiredFeatures: hit-test,local-floor;">
                 <a-camera position="0 1.6 3" rotation="0 0 0" wasd-controls look-controls></a-camera>
                 <a-light type="ambient" intensity="1.0" color="#ffffff"></a-light>
                 <a-light type="directional" intensity="0.8" position="5 10 7" color="#ffffff"></a-light>
@@ -429,13 +429,36 @@
             }
         }
 
-        document.getElementById('arBtn').addEventListener('click', () => {
-            if (scene.is('ar-mode')) {
-                scene.exitAR();
-                document.getElementById('arBtn').textContent = '🥽 View in AR';
+        document.getElementById('arBtn').addEventListener('click', async () => {
+            const arBtn = document.getElementById('arBtn');
+
+            // Check if WebXR is supported
+            if (!navigator.xr) {
+                alert('AR not supported on this device/browser.\n\nTry:\n- Chrome on Android\n- Safari on iOS 13+');
+                console.error('WebXR not available');
+                return;
+            }
+
+            // Check if AR is supported
+            const isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
+            if (!isARSupported) {
+                alert('AR mode not available.\n\nMake sure:\n- Camera permissions are granted\n- You\'re using HTTPS or localhost\n- Your device supports WebXR AR');
+                console.error('immersive-ar not supported');
+                return;
+            }
+
+            // Toggle AR mode (A-Frame uses enterVR for both VR and AR)
+            if (scene.is('ar-mode') || scene.is('vr-mode')) {
+                scene.exitVR();
+                arBtn.textContent = '🥽 View in AR';
             } else {
-                scene.enterAR();
-                document.getElementById('arBtn').textContent = '🏠 Exit AR';
+                try {
+                    scene.enterVR();
+                    arBtn.textContent = '🏠 Exit AR';
+                } catch (error) {
+                    console.error('Failed to enter AR:', error);
+                    alert('Could not enter AR mode. Error: ' + error.message);
+                }
             }
         });
 
@@ -461,8 +484,34 @@
                 sceneReady = true;
                 loadSceneFromUrl();
                 console.log('Scene ready for interaction');
+                checkARSupport();
             }, 500);
         });
+
+        // Check AR support and update button
+        async function checkARSupport() {
+            const arBtn = document.getElementById('arBtn');
+
+            if (!navigator.xr) {
+                arBtn.style.opacity = '0.5';
+                arBtn.title = 'AR not supported on this browser';
+                console.log('WebXR not available - AR button disabled');
+                return;
+            }
+
+            try {
+                const isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!isARSupported) {
+                    arBtn.style.opacity = '0.5';
+                    arBtn.title = 'AR not supported on this device';
+                    console.log('AR mode not supported - button disabled');
+                } else {
+                    console.log('AR mode is available!');
+                }
+            } catch (e) {
+                console.error('Error checking AR support:', e);
+            }
+        }
     </script>
 </body>
 </html>
