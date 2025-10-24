@@ -179,7 +179,7 @@
         </div>
 
         <div id="scene-container">
-            <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+            <a-scene embedded>
                 <a-camera position="0 1.6 0" wasd-controls look-controls></a-camera>
                 <a-light type="ambient" intensity="0.8" color="#ffffff"></a-light>
                 <a-light type="directional" intensity="0.6" position="5 10 5" color="#ffffff"></a-light>
@@ -219,10 +219,8 @@
         let objects = [];
         let selectedObject = null;
         let isDragging = false;
-        let dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-        let raycaster = new THREE.Raycaster();
-        let mouse = new THREE.Vector2();
-        const intersectPoint = new THREE.Vector3();
+        let dragPlane, raycaster, mouse, intersectPoint;
+        let sceneReady = false;
 
         const params = new URLSearchParams(window.location.search);
         const groupId = params.get('group') || '1';
@@ -246,11 +244,12 @@
         }
 
         document.addEventListener('click', (event) => {
+            if (!sceneReady) return;
             if (event.target.tagName === 'BUTTON' || event.target.closest('button')) return;
-            
+
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            
+
             const camera = scene.camera;
             raycaster.setFromCamera(mouse, camera);
             
@@ -270,11 +269,11 @@
         });
 
         document.addEventListener('mousemove', (event) => {
-            if (!isDragging || !selectedObject) return;
-            
+            if (!sceneReady || !isDragging || !selectedObject) return;
+
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            
+
             const camera = scene.camera;
             raycaster.setFromCamera(mouse, camera);
             raycaster.ray.intersectPlane(dragPlane, intersectPoint);
@@ -414,6 +413,13 @@
         });
 
         scene.addEventListener('loaded', () => {
+            // Initialize THREE.js objects after scene is loaded
+            dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            intersectPoint = new THREE.Vector3();
+            sceneReady = true;
+
             loadSceneFromUrl();
         });
     </script>
