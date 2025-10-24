@@ -207,9 +207,10 @@
             <button id="arBtn" class="btn-success">🥽 View in AR</button>
             <button class="btn-secondary" onclick="downloadScene()">⬇️ Download Scene Data</button>
             <div id="info">
-                <strong>Group:</strong> <span id="groupNum">1</span> | 
-                <strong>Objects:</strong> <span id="objectCount">0</span> | 
-                <strong>Tip:</strong> Click and drag objects to move them
+                <strong>Group:</strong> <span id="groupNum">1</span> |
+                <strong>Objects:</strong> <span id="objectCount">0</span> |
+                <strong>Tip:</strong> Click and drag objects to move them<br>
+                <small id="ar-info" style="color: #fbbf24;"></small>
             </div>
         </div>
     </div>
@@ -429,21 +430,46 @@
             }
         }
 
+        // Detect iOS
+        function isIOS() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        }
+
         document.getElementById('arBtn').addEventListener('click', async () => {
             const arBtn = document.getElementById('arBtn');
 
-            // Check if WebXR is supported
+            // iOS Safari doesn't support WebXR yet - provide alternative
+            if (isIOS()) {
+                alert('iOS AR Viewing:\n\n' +
+                      'iOS Safari doesn\'t support WebXR AR yet.\n\n' +
+                      'Alternative options:\n' +
+                      '1. Take a screenshot of your scene\n' +
+                      '2. Use Chrome on Android for full AR\n' +
+                      '3. Use the scene on a tablet/desktop\n\n' +
+                      'Note: Apple is working on WebXR support for future Safari versions.');
+                console.log('iOS detected - WebXR AR not available');
+                return;
+            }
+
+            // Check if WebXR is supported (Android Chrome, etc.)
             if (!navigator.xr) {
-                alert('AR not supported on this device/browser.\n\nTry:\n- Chrome on Android\n- Safari on iOS 13+');
+                alert('AR not supported on this device/browser.\n\nTry:\n- Chrome on Android\n- Firefox Reality\n- Microsoft Edge on Android');
                 console.error('WebXR not available');
                 return;
             }
 
             // Check if AR is supported
-            const isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
-            if (!isARSupported) {
-                alert('AR mode not available.\n\nMake sure:\n- Camera permissions are granted\n- You\'re using HTTPS or localhost\n- Your device supports WebXR AR');
-                console.error('immersive-ar not supported');
+            try {
+                const isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!isARSupported) {
+                    alert('AR mode not available.\n\nMake sure:\n- Camera permissions are granted\n- You\'re using HTTPS\n- Your device supports WebXR AR\n\nRecommended: Chrome on Android');
+                    console.error('immersive-ar not supported');
+                    return;
+                }
+            } catch (error) {
+                alert('Could not check AR support: ' + error.message);
+                console.error('Error checking AR support:', error);
                 return;
             }
 
@@ -457,7 +483,7 @@
                     arBtn.textContent = '🏠 Exit AR';
                 } catch (error) {
                     console.error('Failed to enter AR:', error);
-                    alert('Could not enter AR mode. Error: ' + error.message);
+                    alert('Could not enter AR mode.\n\nError: ' + error.message + '\n\nTry Chrome on Android for best results.');
                 }
             }
         });
@@ -491,10 +517,22 @@
         // Check AR support and update button
         async function checkARSupport() {
             const arBtn = document.getElementById('arBtn');
+            const arInfo = document.getElementById('ar-info');
+
+            // Check for iOS first
+            if (isIOS()) {
+                arBtn.style.opacity = '0.6';
+                arBtn.style.background = '#f39c12';  // Orange color to indicate limited support
+                arBtn.title = 'iOS: WebXR AR not supported yet. Click for alternatives.';
+                arInfo.textContent = 'ℹ️ AR works best on Chrome for Android';
+                console.log('iOS detected - WebXR AR not available (will show alternatives when clicked)');
+                return;
+            }
 
             if (!navigator.xr) {
                 arBtn.style.opacity = '0.5';
-                arBtn.title = 'AR not supported on this browser';
+                arBtn.title = 'AR not supported on this browser. Try Chrome on Android.';
+                arInfo.textContent = 'ℹ️ AR requires Chrome on Android or compatible browser';
                 console.log('WebXR not available - AR button disabled');
                 return;
             }
@@ -504,11 +542,17 @@
                 if (!isARSupported) {
                     arBtn.style.opacity = '0.5';
                     arBtn.title = 'AR not supported on this device';
+                    arInfo.textContent = 'ℹ️ AR not available on this device';
                     console.log('AR mode not supported - button disabled');
                 } else {
+                    arBtn.title = 'Enter AR mode';
+                    arInfo.textContent = '✅ AR is ready!';
                     console.log('AR mode is available!');
                 }
             } catch (e) {
+                arBtn.style.opacity = '0.5';
+                arBtn.title = 'AR support check failed';
+                arInfo.textContent = 'ℹ️ AR status unknown';
                 console.error('Error checking AR support:', e);
             }
         }
