@@ -232,25 +232,37 @@
             const entity = document.createElement('a-entity');
             entity.id = id;
             entity.setAttribute('class', 'draggable-object');
-            entity.setAttribute('position', `${Math.random() * 4 - 2} ${1 + Math.random() * 2} ${-3 - Math.random() * 2}`);
+
+            const position = {
+                x: Math.random() * 4 - 2,
+                y: 1 + Math.random() * 2,
+                z: -3 - Math.random() * 2
+            };
+
+            entity.setAttribute('position', position);
             entity.setAttribute(type, '');
             entity.setAttribute('color', color);
             entity.setAttribute('scale', '0.8 0.8 0.8');
             entity.setAttribute('data-type', type);
             entity.setAttribute('data-color', color);
+
             objectsContainer.appendChild(entity);
             objects.push({ id, type, color, element: entity });
             updateObjectCount();
+
+            console.log(`Added ${type} at position:`, position);
         }
 
         document.addEventListener('click', (event) => {
             if (!sceneReady) return;
             if (event.target.tagName === 'BUTTON' || event.target.closest('button')) return;
 
+            const camera = scene.camera;
+            if (!camera) return;
+
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-            const camera = scene.camera;
             raycaster.setFromCamera(mouse, camera);
             
             const draggables = objectsContainer.querySelectorAll('.draggable-object');
@@ -271,10 +283,12 @@
         document.addEventListener('mousemove', (event) => {
             if (!sceneReady || !isDragging || !selectedObject) return;
 
+            const camera = scene.camera;
+            if (!camera) return;
+
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-            const camera = scene.camera;
             raycaster.setFromCamera(mouse, camera);
             raycaster.ray.intersectPlane(dragPlane, intersectPoint);
             
@@ -413,14 +427,28 @@
         });
 
         scene.addEventListener('loaded', () => {
+            // Wait for THREE.js to be available
+            if (typeof THREE === 'undefined') {
+                console.error('THREE.js is not available');
+                return;
+            }
+
             // Initialize THREE.js objects after scene is loaded
-            dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            dragPlane.setFromNormalAndCoplanarPoint(
+                new THREE.Vector3(0, 1, 0),
+                new THREE.Vector3(0, 0, 0)
+            );
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
             intersectPoint = new THREE.Vector3();
-            sceneReady = true;
 
-            loadSceneFromUrl();
+            // Small delay to ensure everything is ready
+            setTimeout(() => {
+                sceneReady = true;
+                loadSceneFromUrl();
+                console.log('Scene ready for interaction');
+            }, 500);
         });
     </script>
 </body>
