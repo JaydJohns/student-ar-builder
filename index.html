@@ -1078,12 +1078,6 @@
             }
         }
 
-        // Detect iOS
-        function isIOS() {
-            return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        }
-
         // AR Button - Show QR Code Modal
         document.getElementById('arBtn').addEventListener('click', () => {
             showQRModal();
@@ -1114,52 +1108,9 @@
                 sceneReady = true;
                 loadSceneFromUrl();
                 console.log('Scene ready for interaction');
-                checkARSupport();
+                // QR code AR works on any device - no need to check AR support
             }, 500);
         });
-
-        // Check AR support and update button
-        async function checkARSupport() {
-            const arBtn = document.getElementById('arBtn');
-            const arInfo = document.getElementById('ar-info');
-
-            // Check for iOS first
-            if (isIOS()) {
-                arBtn.style.opacity = '0.6';
-                arBtn.style.background = '#f39c12';  // Orange color to indicate limited support
-                arBtn.title = 'iOS: WebXR AR not supported yet. Click for alternatives.';
-                arInfo.textContent = 'ℹ️ AR works best on Chrome for Android';
-                console.log('iOS detected - WebXR AR not available (will show alternatives when clicked)');
-                return;
-            }
-
-            if (!navigator.xr) {
-                arBtn.style.opacity = '0.5';
-                arBtn.title = 'AR not supported on this browser. Try Chrome on Android.';
-                arInfo.textContent = 'ℹ️ AR requires Chrome on Android or compatible browser';
-                console.log('WebXR not available - AR button disabled');
-                return;
-            }
-
-            try {
-                const isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
-                if (!isARSupported) {
-                    arBtn.style.opacity = '0.5';
-                    arBtn.title = 'AR not supported on this device';
-                    arInfo.textContent = 'ℹ️ AR not available on this device';
-                    console.log('AR mode not supported - button disabled');
-                } else {
-                    arBtn.title = 'Enter AR mode';
-                    arInfo.textContent = '✅ AR is ready!';
-                    console.log('AR mode is available!');
-                }
-            } catch (e) {
-                arBtn.style.opacity = '0.5';
-                arBtn.title = 'AR support check failed';
-                arInfo.textContent = 'ℹ️ AR status unknown';
-                console.error('Error checking AR support:', e);
-            }
-        }
     </script>
 </body>
 
