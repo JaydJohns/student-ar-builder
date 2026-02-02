@@ -452,8 +452,9 @@
         <div id="header">
             <div id="groupTitle">Group Workspace</div>
             <div style="display: flex; gap: 10px;">
-                <button id="exportBtn" class="btn-success">📤 Export Scene</button>
-                <button id="clearBtn" class="btn-danger">🗑️ Clear All</button>
+                <button id="saveBtn" class="btn-success" title="Save to this browser">� Save</button>
+                <button id="exportBtn" class="btn-secondary" title="Copy shareable link">🔗 Share Link</button>
+                <button id="clearBtn" class="btn-danger" title="Delete all objects">🗑️ Clear All</button>
             </div>
         </div>
 
@@ -505,8 +506,8 @@
                 <strong>Objects:</strong> <span id="objectCount">0</span> |
                 <strong>Shortcuts:</strong> <kbd>E</kbd> Edit Mode | <kbd>Shift+Drag</kbd> Up/Down | <kbd>Del</kbd>
                 Delete | <kbd>Esc</kbd> Exit<br>
-                <small id="ar-info" style="color: #fbbf24;">📱 Click "AR QR Code" to generate a QR code for mobile AR
-                    viewing</small>
+                <small id="ar-info" style="color: #fbbf24;">� Save = keep your work | 🔗 Share = get a link | 📱 AR QR
+                    Code = view on phone</small>
             </div>
         </div>
     </div>
@@ -880,6 +881,77 @@
             document.getElementById('objectCount').textContent = objects.length;
         }
 
+        // LocalStorage Save/Load Functions
+        function getStorageKey() {
+            return `ar-builder-scene-group-${groupId}`;
+        }
+
+        function getSceneData() {
+            return objects.map(obj => {
+                const pos = obj.element.getAttribute('position');
+                const scale = obj.element.getAttribute('scale');
+                return {
+                    type: obj.type,
+                    color: obj.color,
+                    position: pos,
+                    scale: scale
+                };
+            });
+        }
+
+        function saveToLocalStorage() {
+            const sceneData = getSceneData();
+            const storageKey = getStorageKey();
+
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(sceneData));
+                const timestamp = new Date().toLocaleTimeString();
+                alert(`✅ Scene saved!\n\nYour ${objects.length} object(s) are saved to this browser.\nSaved at: ${timestamp}\n\nYour work will be here when you come back.`);
+                console.log('Scene saved to localStorage:', storageKey);
+            } catch (e) {
+                console.error('Failed to save to localStorage:', e);
+                alert('❌ Could not save. Your browser may be in private mode or storage is full.');
+            }
+        }
+
+        function loadFromLocalStorage() {
+            const storageKey = getStorageKey();
+
+            try {
+                const savedData = localStorage.getItem(storageKey);
+                if (savedData) {
+                    const sceneData = JSON.parse(savedData);
+                    console.log('Found saved scene with', sceneData.length, 'objects');
+                    return sceneData;
+                }
+            } catch (e) {
+                console.error('Failed to load from localStorage:', e);
+            }
+            return null;
+        }
+
+        function restoreSavedScene() {
+            const savedScene = loadFromLocalStorage();
+            if (savedScene && savedScene.length > 0) {
+                // Ask user if they want to restore
+                if (confirm(`Found a saved scene with ${savedScene.length} object(s). Would you like to restore it?`)) {
+                    savedScene.forEach(obj => {
+                        addObject(obj.type, obj.color, obj.position);
+                    });
+                    console.log('Restored', savedScene.length, 'objects from localStorage');
+                }
+            }
+        }
+
+        // Save button event listener
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            if (objects.length === 0) {
+                alert('Nothing to save! Add some objects first.');
+                return;
+            }
+            saveToLocalStorage();
+        });
+
         // QR Code Modal Functions
         let currentARUrl = '';
         let qrCodeInstance = null;
@@ -1001,28 +1073,27 @@
         document.getElementById('delete-selected-btn').addEventListener('click', deleteSelectedObject);
 
         document.getElementById('exportBtn').addEventListener('click', () => {
-            const sceneData = objects.map(obj => {
-                const pos = obj.element.getAttribute('position');
-                const scale = obj.element.getAttribute('scale');
-                return {
-                    type: obj.type,
-                    color: obj.color,
-                    position: pos,
-                    scale: scale
-                };
-            });
+            if (objects.length === 0) {
+                alert('Nothing to share! Add some objects first.');
+                return;
+            }
 
+            const sceneData = getSceneData();
             const encoded = btoa(JSON.stringify(sceneData));
             const shareUrl = `${window.location.href.split('?')[0]}?group=${groupId}&scene=${encoded}`;
 
-            const textarea = document.createElement('textarea');
-            textarea.value = shareUrl;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-
-            alert('Scene link copied to clipboard!\\n\\n' + shareUrl);
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                alert(`🔗 Link copied!\n\nAnyone with this link can view your scene.\nShare it via email, chat, or paste in a document.`);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = shareUrl;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert(`🔗 Link copied!\n\nAnyone with this link can view your scene.`);
+            });
         });
 
         function downloadScene() {
@@ -1107,8 +1178,13 @@
             setTimeout(() => {
                 sceneReady = true;
                 loadSceneFromUrl();
+
+                // If no scene was loaded from URL, check for saved scene in localStorage
+                if (objects.length === 0) {
+                    restoreSavedScene();
+                }
+
                 console.log('Scene ready for interaction');
-                // QR code AR works on any device - no need to check AR support
             }, 500);
         });
     </script>
