@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AR Builder - Group Workspace</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <!-- QR Code Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -141,6 +144,16 @@
             color: #fbbf24;
         }
 
+        #info kbd {
+            background: linear-gradient(180deg, #4a5580 0%, #3b4565 100%);
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-family: monospace;
+            box-shadow: 0 2px 0 #2a3350;
+        }
+
         #camera-info {
             position: absolute;
             top: 10px;
@@ -166,8 +179,274 @@
                 max-height: 200px;
             }
         }
+
+        /* Edit Mode Toggle Button */
+        .btn-edit-mode {
+            background: #3b4565;
+            position: relative;
+        }
+
+        .btn-edit-mode.active {
+            background: #f39c12;
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        .btn-edit-mode.active:hover {
+            background: #e67e22;
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(243, 156, 18, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(243, 156, 18, 0.8);
+            }
+        }
+
+        /* Mode Indicator */
+        #mode-indicator {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        #mode-indicator.view-mode {
+            border: 2px solid #3498db;
+        }
+
+        #mode-indicator.edit-mode {
+            border: 2px solid #f39c12;
+            background: rgba(243, 156, 18, 0.2);
+        }
+
+        #mode-indicator .mode-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #3498db;
+        }
+
+        #mode-indicator.edit-mode .mode-dot {
+            background: #f39c12;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* Selected Object Controls */
+        #selected-object-controls {
+            position: absolute;
+            bottom: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.95);
+            padding: 10px 15px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            z-index: 20;
+            border: 2px solid #f39c12;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        #selected-object-controls.visible {
+            display: flex;
+        }
+
+        #selected-object-controls .object-info {
+            font-size: 13px;
+            color: #fbbf24;
+        }
+
+        #delete-selected-btn {
+            background: #e74c3c;
+            padding: 8px 15px;
+            font-size: 13px;
+        }
+
+        #delete-selected-btn:hover {
+            background: #c0392b;
+        }
+
+        /* QR Code Modal */
+        #qr-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        #qr-modal.visible {
+            display: flex;
+        }
+
+        .qr-modal-content {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .qr-modal-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .qr-modal-subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        #qr-code-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        #qr-code-container canvas,
+        #qr-code-container img {
+            display: block;
+        }
+
+        .qr-instructions {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .qr-instructions h4 {
+            color: #fbbf24;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .qr-instructions ol {
+            color: #e2e8f0;
+            font-size: 13px;
+            text-align: left;
+            padding-left: 20px;
+            line-height: 1.8;
+        }
+
+        .qr-modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .qr-modal-btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s;
+        }
+
+        .qr-modal-btn.primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .qr-modal-btn.primary:hover {
+            background: #764ba2;
+        }
+
+        .qr-modal-btn.secondary {
+            background: #3b4565;
+            color: white;
+        }
+
+        .qr-modal-btn.secondary:hover {
+            background: #4a5580;
+        }
+
+        .qr-url-display {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+            word-break: break-all;
+            font-size: 11px;
+            color: #94a3b8;
+            max-height: 60px;
+            overflow-y: auto;
+        }
+
+        .hosting-note {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            font-size: 12px;
+            color: #fbbf24;
+        }
     </style>
 </head>
+
 <body>
     <div id="container">
         <div id="header">
@@ -184,10 +463,24 @@
                 <a-light type="ambient" intensity="1.0" color="#ffffff"></a-light>
                 <a-light type="directional" intensity="0.8" position="5 10 7" color="#ffffff"></a-light>
                 <a-light type="point" intensity="0.5" position="0 3 0" color="#ffffff"></a-light>
-                <a-plane position="0 0 -4" rotation="-90 0 0" width="20" height="20" color="#4a5580" opacity="0.3"></a-plane>
+                <a-plane position="0 0 -4" rotation="-90 0 0" width="20" height="20" color="#4a5580"
+                    opacity="0.3"></a-plane>
                 <a-entity id="objects-container"></a-entity>
             </a-scene>
-            <div id="camera-info">📱 Drag objects to move | Scroll to rotate view</div>
+            <div id="camera-info">📱 Drag to move horizontally | <strong>Shift+Drag</strong> to move up/down | Scroll to
+                rotate view</div>
+
+            <!-- Mode Indicator -->
+            <div id="mode-indicator" class="view-mode">
+                <span class="mode-dot"></span>
+                <span id="mode-text">View Mode</span>
+            </div>
+
+            <!-- Selected Object Controls -->
+            <div id="selected-object-controls">
+                <span class="object-info">📦 <span id="selected-object-type">Object</span> selected</span>
+                <button id="delete-selected-btn" class="btn-danger">🗑️ Delete</button>
+            </div>
         </div>
 
         <div id="ui-panel">
@@ -204,13 +497,58 @@
                     <button class="asset-btn" onclick="addObject('dodecahedron', '#e67e22')">🔷 Dodeca</button>
                 </div>
             </div>
-            <button id="arBtn" class="btn-success">🥽 View in AR</button>
+            <button id="editModeBtn" class="btn-edit-mode">✏️ Edit Mode</button>
+            <button id="arBtn" class="btn-success">📱 AR QR Code</button>
             <button class="btn-secondary" onclick="downloadScene()">⬇️ Download Scene Data</button>
             <div id="info">
                 <strong>Group:</strong> <span id="groupNum">1</span> |
                 <strong>Objects:</strong> <span id="objectCount">0</span> |
-                <strong>Tip:</strong> Click and drag objects to move them<br>
-                <small id="ar-info" style="color: #fbbf24;"></small>
+                <strong>Shortcuts:</strong> <kbd>E</kbd> Edit Mode | <kbd>Shift+Drag</kbd> Up/Down | <kbd>Del</kbd>
+                Delete | <kbd>Esc</kbd> Exit<br>
+                <small id="ar-info" style="color: #fbbf24;">📱 Click "AR QR Code" to generate a QR code for mobile AR
+                    viewing</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qr-modal">
+        <div class="qr-modal-content">
+            <div class="qr-modal-title">
+                📱 View in AR
+            </div>
+            <div class="qr-modal-subtitle">
+                Scan this QR code with your phone to view your scene in augmented reality
+            </div>
+
+            <div id="qr-code-container">
+                <!-- QR code will be generated here -->
+            </div>
+
+            <div class="qr-instructions">
+                <h4>📋 Instructions for Students:</h4>
+                <ol>
+                    <li>Open your phone's camera app</li>
+                    <li>Point it at the QR code above</li>
+                    <li>Tap the notification that appears</li>
+                    <li>Allow camera access when prompted</li>
+                    <li>Point your phone at a flat surface to see your objects!</li>
+                </ol>
+            </div>
+
+            <div class="qr-url-display" id="ar-url-display">
+                Loading AR URL...
+            </div>
+
+            <div class="qr-modal-buttons">
+                <button class="qr-modal-btn secondary" onclick="copyARUrl()">📋 Copy Link</button>
+                <button class="qr-modal-btn primary" onclick="closeQRModal()">✕ Close</button>
+            </div>
+
+            <div class="hosting-note" id="hosting-note" style="display: none;">
+                ⚠️ <strong>Note:</strong> For QR codes to work, this page must be hosted on a web server (not opened as
+                a local file).
+                Use GitHub Pages, Netlify, or any web hosting service.
             </div>
         </div>
     </div>
@@ -221,8 +559,118 @@
         let objects = [];
         let selectedObject = null;
         let isDragging = false;
-        let dragPlane, raycaster, mouse, intersectPoint;
+        let dragPlane, verticalDragPlane, raycaster, mouse, intersectPoint;
         let sceneReady = false;
+        let isShiftHeld = false;
+        let lastMouseY = 0;
+        let cameraEl = null;
+        let isEditMode = false;
+        let persistentSelectedObject = null; // For tracking selection outside of drag
+
+        // Helper function to enable/disable camera controls
+        function setCameraControlsEnabled(enabled) {
+            if (!cameraEl) return;
+            if (enabled) {
+                cameraEl.setAttribute('look-controls', 'enabled', true);
+                cameraEl.setAttribute('wasd-controls', 'enabled', true);
+            } else {
+                cameraEl.setAttribute('look-controls', 'enabled', false);
+                cameraEl.setAttribute('wasd-controls', 'enabled', false);
+            }
+        }
+
+        // Helper function to add/remove glow effect on objects
+        function setObjectGlow(entity, glowing) {
+            if (!entity) return;
+            const color = entity.getAttribute('data-color') || '#ffffff';
+            if (glowing) {
+                entity.setAttribute('material', {
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.4
+                });
+            } else {
+                entity.setAttribute('material', {
+                    color: color,
+                    emissive: '#000000',
+                    emissiveIntensity: 0
+                });
+            }
+        }
+
+        // Helper function to update mode indicator UI
+        function updateModeIndicator() {
+            const indicator = document.getElementById('mode-indicator');
+            const modeText = document.getElementById('mode-text');
+            const editModeBtn = document.getElementById('editModeBtn');
+
+            if (isEditMode) {
+                indicator.className = 'edit-mode';
+                modeText.textContent = 'Edit Mode';
+                editModeBtn.classList.add('active');
+                editModeBtn.textContent = '✔️ Editing';
+            } else {
+                indicator.className = 'view-mode';
+                modeText.textContent = 'View Mode';
+                editModeBtn.classList.remove('active');
+                editModeBtn.textContent = '✏️ Edit Mode';
+            }
+        }
+
+        // Helper function to show/hide selected object controls
+        function updateSelectionUI(obj) {
+            const controls = document.getElementById('selected-object-controls');
+            const typeSpan = document.getElementById('selected-object-type');
+
+            if (obj && isEditMode) {
+                const objType = obj.getAttribute('data-type') || 'Object';
+                typeSpan.textContent = objType.charAt(0).toUpperCase() + objType.slice(1);
+                controls.classList.add('visible');
+            } else {
+                controls.classList.remove('visible');
+            }
+        }
+
+        // Function to delete the currently selected object
+        function deleteSelectedObject() {
+            if (!persistentSelectedObject) return;
+
+            const objId = persistentSelectedObject.id;
+
+            // Remove glow
+            setObjectGlow(persistentSelectedObject, false);
+
+            // Remove from DOM
+            persistentSelectedObject.remove();
+
+            // Remove from objects array
+            objects = objects.filter(o => o.id !== objId);
+
+            // Clear selection
+            persistentSelectedObject = null;
+            selectedObject = null;
+            updateSelectionUI(null);
+            updateObjectCount();
+
+            console.log(`Deleted object: ${objId}`);
+        }
+
+        // Toggle edit mode
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            updateModeIndicator();
+
+            // If exiting edit mode, clear selection
+            if (!isEditMode && persistentSelectedObject) {
+                setObjectGlow(persistentSelectedObject, false);
+                persistentSelectedObject.setAttribute('scale', '1.2 1.2 1.2');
+                persistentSelectedObject = null;
+                updateSelectionUI(null);
+            }
+
+            // Update camera controls based on mode
+            setCameraControlsEnabled(!isEditMode);
+        }
 
         const params = new URLSearchParams(window.location.search);
         const groupId = params.get('group') || '1';
@@ -249,7 +697,7 @@
                 radiusBottom: type === 'cone' ? 0.5 : undefined,
                 radiusTop: type === 'cone' ? 0.1 : undefined
             });
-            entity.setAttribute('material', {color: color});
+            entity.setAttribute('material', { color: color });
             entity.setAttribute('scale', '1.2 1.2 1.2');
             entity.setAttribute('data-type', type);
             entity.setAttribute('data-color', color);
@@ -265,6 +713,9 @@
             if (!sceneReady) return;
             if (event.target.tagName === 'BUTTON' || event.target.closest('button')) return;
 
+            // Only allow object interaction in Edit Mode
+            if (!isEditMode) return;
+
             const camera = scene.camera;
             if (!camera) return;
 
@@ -272,19 +723,76 @@
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            
+
             const draggables = objectsContainer.querySelectorAll('.draggable-object');
             const intersects = raycaster.intersectObjects(
                 Array.from(draggables).map(d => d.object3D.children[0] || d.object3D),
                 true
             );
-            
+
             if (intersects.length > 0) {
-                selectedObject = intersects[0].object.el || intersects[0].object.parent.el;
+                const clickedObject = intersects[0].object.el || intersects[0].object.parent.el;
+
+                // If clicking a different object, deselect the previous one
+                if (persistentSelectedObject && persistentSelectedObject !== clickedObject) {
+                    setObjectGlow(persistentSelectedObject, false);
+                    persistentSelectedObject.setAttribute('scale', '1.2 1.2 1.2');
+                }
+
+                // Select the new object
+                selectedObject = clickedObject;
+                persistentSelectedObject = clickedObject;
                 isDragging = true;
-                selectedObject.setAttribute('scale', '0.95 0.95 0.95');
+                lastMouseY = event.clientY;
+
+                // Apply visual feedback
+                selectedObject.setAttribute('scale', '1.3 1.3 1.3');
+                setObjectGlow(selectedObject, true);
+                updateSelectionUI(selectedObject);
+
+                // Disable camera controls while dragging
+                setCameraControlsEnabled(false);
             } else {
+                // Clicked on empty space - deselect current object
+                if (persistentSelectedObject) {
+                    setObjectGlow(persistentSelectedObject, false);
+                    persistentSelectedObject.setAttribute('scale', '1.2 1.2 1.2');
+                    persistentSelectedObject = null;
+                    updateSelectionUI(null);
+                }
                 selectedObject = null;
+            }
+        });
+
+        // Track Shift key state and keyboard shortcuts
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Shift') {
+                isShiftHeld = true;
+            }
+
+            // Delete key to remove selected object
+            if ((event.key === 'Delete' || event.key === 'Backspace') && persistentSelectedObject && isEditMode) {
+                event.preventDefault();
+                deleteSelectedObject();
+            }
+
+            // Escape to exit edit mode
+            if (event.key === 'Escape' && isEditMode) {
+                toggleEditMode();
+            }
+
+            // E key to toggle edit mode
+            if (event.key === 'e' || event.key === 'E') {
+                // Don't toggle if typing in an input
+                if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
+                    toggleEditMode();
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'Shift') {
+                isShiftHeld = false;
             }
         });
 
@@ -297,23 +805,46 @@
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-            raycaster.setFromCamera(mouse, camera);
-            raycaster.ray.intersectPlane(dragPlane, intersectPoint);
-            
             const pos = selectedObject.getAttribute('position');
-            selectedObject.setAttribute('position', {
-                x: intersectPoint.x,
-                y: pos.y,
-                z: intersectPoint.z
-            });
+
+            if (isShiftHeld) {
+                // Vertical movement (Y-axis) based on mouse Y delta
+                const deltaY = (lastMouseY - event.clientY) * 0.01;
+                const newY = Math.max(0.1, pos.y + deltaY); // Keep above ground
+                selectedObject.setAttribute('position', {
+                    x: pos.x,
+                    y: newY,
+                    z: pos.z
+                });
+            } else {
+                // Horizontal movement (X and Z axes)
+                raycaster.setFromCamera(mouse, camera);
+                raycaster.ray.intersectPlane(dragPlane, intersectPoint);
+
+                selectedObject.setAttribute('position', {
+                    x: intersectPoint.x,
+                    y: pos.y,
+                    z: intersectPoint.z
+                });
+            }
+
+            lastMouseY = event.clientY;
         });
 
         document.addEventListener('mouseup', () => {
-            if (selectedObject) {
-                selectedObject.setAttribute('scale', '0.8 0.8 0.8');
+            if (selectedObject && persistentSelectedObject === selectedObject) {
+                // Keep the selected scale (slightly larger) but not the drag scale
+                selectedObject.setAttribute('scale', '1.25 1.25 1.25');
             }
             isDragging = false;
             selectedObject = null;
+
+            // Re-enable camera controls after dragging (but stay in edit mode)
+            if (isEditMode) {
+                setCameraControlsEnabled(false); // Keep camera locked in edit mode
+            } else {
+                setCameraControlsEnabled(true);
+            }
         });
 
         document.addEventListener('touchstart', (event) => {
@@ -323,6 +854,11 @@
                 clientY: touch.clientY
             });
             document.dispatchEvent(clickEvent);
+
+            // Disable camera controls on touch drag
+            if (isDragging) {
+                setCameraControlsEnabled(false);
+            }
         });
 
         document.addEventListener('touchmove', (event) => {
@@ -344,13 +880,125 @@
             document.getElementById('objectCount').textContent = objects.length;
         }
 
+        // QR Code Modal Functions
+        let currentARUrl = '';
+        let qrCodeInstance = null;
+
+        function generateARUrl() {
+            // Get current scene data
+            const sceneData = objects.map(obj => {
+                const pos = obj.element.getAttribute('position');
+                const scale = obj.element.getAttribute('scale');
+                return {
+                    type: obj.type,
+                    color: obj.color,
+                    position: pos,
+                    scale: scale
+                };
+            });
+
+            // Encode scene data
+            const encoded = btoa(JSON.stringify(sceneData));
+
+            // Build the AR viewer URL
+            const baseUrl = window.location.href.split('?')[0];
+            const arViewerUrl = baseUrl.replace('index.html', 'ar-viewer.html');
+
+            return `${arViewerUrl}?group=${groupId}&scene=${encoded}`;
+        }
+
+        function showQRModal() {
+            if (objects.length === 0) {
+                alert('Please add at least one object to your scene before viewing in AR.');
+                return;
+            }
+
+            const modal = document.getElementById('qr-modal');
+            const qrContainer = document.getElementById('qr-code-container');
+            const urlDisplay = document.getElementById('ar-url-display');
+            const hostingNote = document.getElementById('hosting-note');
+
+            // Generate AR URL
+            currentARUrl = generateARUrl();
+            urlDisplay.textContent = currentARUrl;
+
+            // Check if running from file:// protocol
+            if (window.location.protocol === 'file:') {
+                hostingNote.style.display = 'block';
+            } else {
+                hostingNote.style.display = 'none';
+            }
+
+            // Clear previous QR code
+            qrContainer.innerHTML = '';
+
+            // Generate new QR code
+            try {
+                qrCodeInstance = new QRCode(qrContainer, {
+                    text: currentARUrl,
+                    width: 200,
+                    height: 200,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } catch (e) {
+                console.error('Failed to generate QR code:', e);
+                qrContainer.innerHTML = '<div style="color: #e74c3c; padding: 20px;">Failed to generate QR code</div>';
+            }
+
+            // Show modal
+            modal.classList.add('visible');
+        }
+
+        function closeQRModal() {
+            const modal = document.getElementById('qr-modal');
+            modal.classList.remove('visible');
+        }
+
+        function copyARUrl() {
+            if (!currentARUrl) return;
+
+            navigator.clipboard.writeText(currentARUrl).then(() => {
+                alert('AR link copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = currentARUrl;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('AR link copied to clipboard!');
+            });
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('qr-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'qr-modal') {
+                closeQRModal();
+            }
+        });
+
         document.getElementById('clearBtn').addEventListener('click', () => {
             if (confirm('Clear all objects? This cannot be undone.')) {
+                // Clear any selection first
+                if (persistentSelectedObject) {
+                    setObjectGlow(persistentSelectedObject, false);
+                    persistentSelectedObject = null;
+                    updateSelectionUI(null);
+                }
                 objectsContainer.innerHTML = '';
                 objects = [];
                 updateObjectCount();
             }
         });
+
+        // Edit Mode toggle button
+        document.getElementById('editModeBtn').addEventListener('click', toggleEditMode);
+
+        // Delete selected object button
+        document.getElementById('delete-selected-btn').addEventListener('click', deleteSelectedObject);
 
         document.getElementById('exportBtn').addEventListener('click', () => {
             const sceneData = objects.map(obj => {
@@ -366,14 +1014,14 @@
 
             const encoded = btoa(JSON.stringify(sceneData));
             const shareUrl = `${window.location.href.split('?')[0]}?group=${groupId}&scene=${encoded}`;
-            
+
             const textarea = document.createElement('textarea');
             textarea.value = shareUrl;
             document.body.appendChild(textarea);
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
-            
+
             alert('Scene link copied to clipboard!\\n\\n' + shareUrl);
         });
 
@@ -416,7 +1064,7 @@
                             radiusBottom: obj.type === 'cone' ? 0.5 : undefined,
                             radiusTop: obj.type === 'cone' ? 0.1 : undefined
                         });
-                        entity.setAttribute('material', {color: obj.color});
+                        entity.setAttribute('material', { color: obj.color });
                         entity.setAttribute('scale', obj.scale);
                         entity.setAttribute('data-type', obj.type);
                         entity.setAttribute('data-color', obj.color);
@@ -433,59 +1081,12 @@
         // Detect iOS
         function isIOS() {
             return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         }
 
-        document.getElementById('arBtn').addEventListener('click', async () => {
-            const arBtn = document.getElementById('arBtn');
-
-            // iOS Safari doesn't support WebXR yet - provide alternative
-            if (isIOS()) {
-                alert('iOS AR Viewing:\n\n' +
-                      'iOS Safari doesn\'t support WebXR AR yet.\n\n' +
-                      'Alternative options:\n' +
-                      '1. Take a screenshot of your scene\n' +
-                      '2. Use Chrome on Android for full AR\n' +
-                      '3. Use the scene on a tablet/desktop\n\n' +
-                      'Note: Apple is working on WebXR support for future Safari versions.');
-                console.log('iOS detected - WebXR AR not available');
-                return;
-            }
-
-            // Check if WebXR is supported (Android Chrome, etc.)
-            if (!navigator.xr) {
-                alert('AR not supported on this device/browser.\n\nTry:\n- Chrome on Android\n- Firefox Reality\n- Microsoft Edge on Android');
-                console.error('WebXR not available');
-                return;
-            }
-
-            // Check if AR is supported
-            try {
-                const isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
-                if (!isARSupported) {
-                    alert('AR mode not available.\n\nMake sure:\n- Camera permissions are granted\n- You\'re using HTTPS\n- Your device supports WebXR AR\n\nRecommended: Chrome on Android');
-                    console.error('immersive-ar not supported');
-                    return;
-                }
-            } catch (error) {
-                alert('Could not check AR support: ' + error.message);
-                console.error('Error checking AR support:', error);
-                return;
-            }
-
-            // Toggle AR mode (A-Frame uses enterVR for both VR and AR)
-            if (scene.is('ar-mode') || scene.is('vr-mode')) {
-                scene.exitVR();
-                arBtn.textContent = '🥽 View in AR';
-            } else {
-                try {
-                    scene.enterVR();
-                    arBtn.textContent = '🏠 Exit AR';
-                } catch (error) {
-                    console.error('Failed to enter AR:', error);
-                    alert('Could not enter AR mode.\n\nError: ' + error.message + '\n\nTry Chrome on Android for best results.');
-                }
-            }
+        // AR Button - Show QR Code Modal
+        document.getElementById('arBtn').addEventListener('click', () => {
+            showQRModal();
         });
 
         scene.addEventListener('loaded', () => {
@@ -504,6 +1105,9 @@
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
             intersectPoint = new THREE.Vector3();
+
+            // Get camera element reference
+            cameraEl = document.querySelector('a-camera');
 
             // Small delay to ensure everything is ready
             setTimeout(() => {
@@ -558,4 +1162,5 @@
         }
     </script>
 </body>
+
 </html>
