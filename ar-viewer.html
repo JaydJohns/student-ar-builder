@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>AR Viewer</title>
 
-    <!-- A-Frame for 3D rendering -->
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <!-- Three.js for 3D rendering with transparent background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <style>
         * {
@@ -23,6 +23,7 @@
             height: 100%;
             overflow: hidden;
             background: #000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
         /* Camera video - fullscreen background */
@@ -33,25 +34,18 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            z-index: 0;
+            z-index: 1;
         }
 
-        /* 3D canvas overlay - must be transparent */
-        #scene-container {
+        /* Three.js canvas overlay */
+        #three-canvas {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 1;
+            z-index: 2;
             pointer-events: none;
-        }
-
-        /* Force A-Frame canvas to be transparent */
-        a-scene,
-        .a-canvas {
-            background: transparent !important;
-            background-color: transparent !important;
         }
 
         /* Loading screen */
@@ -79,7 +73,7 @@
         }
 
         #loading h1 {
-            font-size: 24px;
+            font-size: 22px;
             margin-bottom: 15px;
         }
 
@@ -153,7 +147,7 @@
             cursor: pointer;
         }
 
-        /* Close button - only control needed */
+        /* Close button */
         #close-btn {
             position: fixed;
             top: 20px;
@@ -162,6 +156,7 @@
             height: 50px;
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             color: white;
@@ -184,6 +179,7 @@
             left: 20px;
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border-radius: 20px;
             color: white;
             padding: 8px 16px;
@@ -191,25 +187,26 @@
             z-index: 50;
         }
 
-        /* Pinch to zoom hint */
+        /* Hint */
         #hint {
             position: fixed;
-            bottom: 30px;
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border-radius: 20px;
             color: white;
-            padding: 10px 20px;
-            font-size: 12px;
+            padding: 12px 24px;
+            font-size: 14px;
             z-index: 50;
-            opacity: 1;
             transition: opacity 0.5s;
         }
 
         #hint.hidden {
             opacity: 0;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -233,30 +230,13 @@
     <!-- Camera Video Background -->
     <video id="camera-video" autoplay playsinline muted></video>
 
-    <!-- 3D Scene Overlay -->
-    <div id="scene-container">
-        <a-scene id="scene" embedded vr-mode-ui="enabled: false"
-            renderer="alpha: true; antialias: true; colorManagement: true">
-            <!-- Simple camera -->
-            <a-entity id="camera-rig">
-                <a-camera id="camera"
-                    look-controls="enabled: true; touchEnabled: true; magicWindowTrackingEnabled: true"
-                    wasd-controls="enabled: false"></a-camera>
-            </a-entity>
-
-            <!-- Lighting -->
-            <a-light type="ambient" intensity="0.7"></a-light>
-            <a-light type="directional" position="1 2 1" intensity="0.5"></a-light>
-
-            <!-- Objects container -->
-            <a-entity id="objects-container" position="0 0 -2.5" scale="0.5 0.5 0.5"></a-entity>
-        </a-scene>
-    </div>
+    <!-- Three.js Canvas (rendered with transparent background) -->
+    <canvas id="three-canvas"></canvas>
 
     <!-- UI Overlays -->
     <div id="object-badge"><span id="object-count">0</span> objects</div>
     <button id="close-btn" onclick="closeViewer()">✕</button>
-    <div id="hint">👆 Tap and drag to look around</div>
+    <div id="hint">📱 Move your phone to look around</div>
 
     <script>
         // Get scene data from URL
@@ -265,10 +245,13 @@
         const groupId = params.get('group') || '1';
         let sceneData = [];
 
-        // Load scene data
+        // Three.js variables
+        let scene, camera, renderer;
+        let objectsGroup;
+
+        // Load scene data from URL
         function loadSceneData() {
             if (!sceneParam) {
-                // Demo scene if no data
                 sceneData = [
                     { type: 'box', color: '#e74c3c', position: { x: 0, y: 0.5, z: 0 } },
                     { type: 'sphere', color: '#3498db', position: { x: 1.2, y: 0.5, z: 0.5 } }
@@ -284,59 +267,193 @@
             }
         }
 
-        // Create 3D objects
+        // Initialize Three.js scene
+        function initThreeJS() {
+            const canvas = document.getElementById('three-canvas');
+
+            // Scene
+            scene = new THREE.Scene();
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.6, 0);
+
+            // Renderer with transparent background
+            renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                alpha: true,  // Enable transparency
+                antialias: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(0x000000, 0); // Fully transparent background
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(2, 5, 3);
+            scene.add(directionalLight);
+
+            // Container for objects
+            objectsGroup = new THREE.Group();
+            objectsGroup.position.set(0, 0, -2.5);
+            scene.add(objectsGroup);
+
+            // Handle resize
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // Create 3D objects from scene data
         function createObjects() {
-            const container = document.getElementById('objects-container');
-            if (!container) return;
-
             sceneData.forEach((obj, i) => {
-                const el = document.createElement('a-entity');
-                
-                // Position
-                const pos = obj.position || { x: 0, y: 0.5, z: 0 };
-                el.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
-
-                // Geometry
-                const geom = { primitive: obj.type || 'box' };
-                if (obj.type === 'sphere') geom.radius = 0.5;
-                else if (obj.type === 'cylinder') { geom.radius = 0.5; geom.height = 1; }
-                else if (obj.type === 'cone') { geom.radiusBottom = 0.5; geom.radiusTop = 0.05; geom.height = 1; }
-                else if (obj.type === 'dodecahedron') geom.radius = 0.5;
-                else if (obj.type === 'plane') { geom.width = 1; geom.height = 1; }
-                
-                el.setAttribute('geometry', geom);
-                el.setAttribute('material', { color: obj.color || '#888', metalness: 0.1, roughness: 0.7 });
-
-                // Scale
+                let geometry;
                 const scale = obj.scale || { x: 1, y: 1, z: 1 };
-                el.setAttribute('scale', `${scale.x} ${scale.y} ${scale.z}`);
 
-                container.appendChild(el);
+                switch (obj.type) {
+                    case 'sphere':
+                        geometry = new THREE.SphereGeometry(0.5, 32, 32);
+                        break;
+                    case 'cylinder':
+                        geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+                        break;
+                    case 'cone':
+                        geometry = new THREE.ConeGeometry(0.5, 1, 32);
+                        break;
+                    case 'dodecahedron':
+                        geometry = new THREE.DodecahedronGeometry(0.5);
+                        break;
+                    case 'plane':
+                        geometry = new THREE.PlaneGeometry(1, 1);
+                        break;
+                    case 'torus':
+                        geometry = new THREE.TorusGeometry(0.4, 0.15, 16, 32);
+                        break;
+                    default: // box
+                        geometry = new THREE.BoxGeometry(1, 1, 1);
+                }
+
+                const material = new THREE.MeshStandardMaterial({
+                    color: obj.color || '#888888',
+                    metalness: 0.1,
+                    roughness: 0.7
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+
+                const pos = obj.position || { x: 0, y: 0.5, z: 0 };
+                mesh.position.set(pos.x, pos.y, pos.z);
+                mesh.scale.set(scale.x * 0.5, scale.y * 0.5, scale.z * 0.5);
+
+                objectsGroup.add(mesh);
             });
 
             document.getElementById('object-count').textContent = sceneData.length;
+        }
+
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Device orientation for AR look-around
+        let initialAlpha = null;
+        let targetRotation = { x: 0, y: 0 };
+        let currentRotation = { x: 0, y: 0 };
+
+        function handleOrientation(event) {
+            if (event.alpha === null) return;
+
+            // Set initial orientation as forward direction
+            if (initialAlpha === null) {
+                initialAlpha = event.alpha;
+            }
+
+            // Calculate rotation from initial position
+            let alpha = event.alpha - initialAlpha; // Y rotation (left/right)
+            let beta = event.beta - 90; // X rotation (up/down) - 90 because phone is held upright
+            let gamma = event.gamma; // Z rotation (tilt)
+
+            // Normalize alpha to -180 to 180
+            if (alpha > 180) alpha -= 360;
+            if (alpha < -180) alpha += 360;
+
+            // Clamp beta
+            beta = Math.max(-85, Math.min(85, beta));
+
+            targetRotation.x = THREE.MathUtils.degToRad(-beta);
+            targetRotation.y = THREE.MathUtils.degToRad(-alpha);
+        }
+
+        // Request device orientation permission (iOS 13+)
+        async function requestOrientationPermission() {
+            if (typeof DeviceOrientationEvent !== 'undefined' &&
+                typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        return true;
+                    }
+                } catch (e) {
+                    console.log('Orientation permission error:', e);
+                }
+                return false;
+            } else {
+                // Android or older iOS - just add listener
+                window.addEventListener('deviceorientation', handleOrientation);
+                return true;
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Smooth camera rotation
+            currentRotation.x += (targetRotation.x - currentRotation.x) * 0.1;
+            currentRotation.y += (targetRotation.y - currentRotation.y) * 0.1;
+
+            camera.rotation.x = currentRotation.x;
+            camera.rotation.y = currentRotation.y;
+
+            // Slow rotation for objects
+            if (objectsGroup) {
+                objectsGroup.children.forEach((obj, i) => {
+                    obj.rotation.y += 0.005 + (i * 0.001);
+                });
+            }
+
+            renderer.render(scene, camera);
         }
 
         // Start camera
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
                     audio: false
                 });
 
                 const video = document.getElementById('camera-video');
                 video.srcObject = stream;
                 await video.play();
-                
+
                 console.log('Camera started');
                 return true;
             } catch (err) {
                 console.error('Camera error:', err);
-                document.getElementById('error-message').textContent = 
-                    err.name === 'NotAllowedError' 
+                document.getElementById('error-message').textContent =
+                    err.name === 'NotAllowedError'
                         ? 'Camera access was denied. Please allow camera permissions and reload.'
-                        : 'Could not access camera. Please try a different browser.';
+                        : 'Could not access camera: ' + err.message;
                 document.getElementById('error-screen').classList.add('visible');
                 document.getElementById('loading').classList.add('hidden');
                 return false;
@@ -350,13 +467,13 @@
             if (video.srcObject) {
                 video.srcObject.getTracks().forEach(t => t.stop());
             }
-            
+
             // Navigate back
             const baseUrl = window.location.href.split('ar-viewer')[0];
             window.location.href = baseUrl + 'index.html?group=' + groupId;
         }
 
-        // Hide hint after 5 seconds
+        // Hide hint after delay
         function hideHint() {
             setTimeout(() => {
                 document.getElementById('hint').classList.add('hidden');
@@ -371,14 +488,27 @@
             const cameraOk = await startCamera();
             if (!cameraOk) return;
 
-            // Wait for scene to load
-            const scene = document.getElementById('scene');
-            scene.addEventListener('loaded', () => {
-                createObjects();
-                document.getElementById('loading').classList.add('hidden');
-                hideHint();
-            });
+            // Setup Three.js
+            initThreeJS();
+            createObjects();
+
+            // Request orientation permission and start
+            await requestOrientationPermission();
+
+            // Hide loading
+            document.getElementById('loading').classList.add('hidden');
+            hideHint();
+
+            // Start render loop
+            animate();
         });
+
+        // Touch to request orientation on iOS
+        document.body.addEventListener('touchstart', async () => {
+            if (initialAlpha === null) {
+                await requestOrientationPermission();
+            }
+        }, { once: true });
     </script>
 </body>
 

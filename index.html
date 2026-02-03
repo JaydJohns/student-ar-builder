@@ -972,9 +972,26 @@
             // Encode scene data
             const encoded = btoa(JSON.stringify(sceneData));
 
-            // Build the AR viewer URL
-            const baseUrl = window.location.href.split('?')[0];
-            const arViewerUrl = baseUrl.replace('index.html', 'ar-viewer.html');
+            // Build the AR viewer URL - handle both local and GitHub Pages URLs
+            let baseUrl = window.location.href.split('?')[0];
+
+            // Remove trailing slash if present
+            if (baseUrl.endsWith('/')) {
+                baseUrl = baseUrl.slice(0, -1);
+            }
+
+            // Remove index.html if present
+            if (baseUrl.endsWith('index.html')) {
+                baseUrl = baseUrl.replace('index.html', '');
+            }
+
+            // Ensure baseUrl ends with /
+            if (!baseUrl.endsWith('/')) {
+                baseUrl += '/';
+            }
+
+            const arViewerUrl = baseUrl + 'ar-viewer.html';
+            console.log('AR Viewer URL:', arViewerUrl);
 
             return `${arViewerUrl}?group=${groupId}&scene=${encoded}`;
         }
