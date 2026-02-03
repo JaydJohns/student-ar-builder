@@ -45,7 +45,6 @@
             width: 100%;
             height: 100%;
             z-index: 2;
-            pointer-events: none;
         }
 
         /* Loading screen */
@@ -97,6 +96,52 @@
             to {
                 transform: rotate(360deg);
             }
+        }
+
+        /* Orientation permission prompt */
+        #orientation-prompt {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+
+        #orientation-prompt.visible {
+            display: flex;
+        }
+
+        #orientation-prompt h2 {
+            font-size: 22px;
+            margin-bottom: 15px;
+        }
+
+        #orientation-prompt p {
+            font-size: 14px;
+            opacity: 0.8;
+            max-width: 280px;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        #orientation-prompt button {
+            background: #667eea;
+            border: none;
+            color: white;
+            padding: 18px 40px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
         }
 
         /* Error screen */
@@ -187,10 +232,27 @@
             z-index: 50;
         }
 
+        /* Debug info */
+        #debug-info {
+            position: fixed;
+            bottom: 80px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 10px;
+            color: white;
+            padding: 10px 15px;
+            font-size: 11px;
+            z-index: 50;
+            font-family: monospace;
+            display: none;
+        }
+
         /* Hint */
         #hint {
             position: fixed;
-            bottom: 40px;
+            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.6);
@@ -219,6 +281,13 @@
         <p>Please allow camera access when prompted</p>
     </div>
 
+    <!-- Orientation Permission Prompt (iOS needs user interaction) -->
+    <div id="orientation-prompt">
+        <h2>📱 Enable AR Motion</h2>
+        <p>Tap the button below to enable motion tracking so objects stay in place as you move your phone.</p>
+        <button onclick="enableMotion()">Enable Motion</button>
+    </div>
+
     <!-- Error Screen -->
     <div id="error-screen">
         <div class="icon">📱</div>
@@ -237,6 +306,7 @@
     <div id="object-badge"><span id="object-count">0</span> objects</div>
     <button id="close-btn" onclick="closeViewer()">✕</button>
     <div id="hint">📱 Move your phone to look around</div>
+    <div id="debug-info"></div>
 
     <script>
         // Get scene data from URL
@@ -248,6 +318,10 @@
         // Three.js variables
         let scene, camera, renderer;
         let objectsGroup;
+
+        // Orientation tracking
+        let orientationEnabled = false;
+        let initialOrientation = null;
 
         // Load scene data from URL
         function loadSceneData() {
@@ -276,29 +350,29 @@
 
             // Camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 1.6, 0);
+            camera.position.set(0, 0, 0); // Camera at origin
 
             // Renderer with transparent background
             renderer = new THREE.WebGLRenderer({
                 canvas: canvas,
-                alpha: true,  // Enable transparency
+                alpha: true,
                 antialias: true
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setClearColor(0x000000, 0); // Fully transparent background
+            renderer.setClearColor(0x000000, 0);
 
             // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
             directionalLight.position.set(2, 5, 3);
             scene.add(directionalLight);
 
-            // Container for objects
+            // Container for objects - placed in front of camera
             objectsGroup = new THREE.Group();
-            objectsGroup.position.set(0, 0, -2.5);
+            objectsGroup.position.set(0, 0, -3); // 3 meters in front
             scene.add(objectsGroup);
 
             // Handle resize
@@ -330,7 +404,7 @@
                     case 'torus':
                         geometry = new THREE.TorusGeometry(0.4, 0.15, 16, 32);
                         break;
-                    default: // box
+                    default:
                         geometry = new THREE.BoxGeometry(1, 1, 1);
                 }
 
@@ -359,71 +433,92 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Device orientation for AR look-around
-        let initialAlpha = null;
-        let targetRotation = { x: 0, y: 0 };
-        let currentRotation = { x: 0, y: 0 };
+        // Device orientation handler
+        function handleDeviceOrientation(event) {
+            if (!orientationEnabled) return;
+            if (event.alpha === null || event.beta === null || event.gamma === null) return;
 
-        function handleOrientation(event) {
-            if (event.alpha === null) return;
-
-            // Set initial orientation as forward direction
-            if (initialAlpha === null) {
-                initialAlpha = event.alpha;
+            // Store initial orientation on first reading
+            if (initialOrientation === null) {
+                initialOrientation = {
+                    alpha: event.alpha,
+                    beta: event.beta,
+                    gamma: event.gamma
+                };
             }
 
-            // Calculate rotation from initial position
-            let alpha = event.alpha - initialAlpha; // Y rotation (left/right)
-            let beta = event.beta - 90; // X rotation (up/down) - 90 because phone is held upright
-            let gamma = event.gamma; // Z rotation (tilt)
+            // Get device orientation angles
+            const alpha = event.alpha; // Compass direction (0-360)
+            const beta = event.beta;   // Front-back tilt (-180 to 180)
+            const gamma = event.gamma; // Left-right tilt (-90 to 90)
 
-            // Normalize alpha to -180 to 180
-            if (alpha > 180) alpha -= 360;
-            if (alpha < -180) alpha += 360;
+            // Convert to radians
+            const alphaRad = THREE.MathUtils.degToRad(alpha);
+            const betaRad = THREE.MathUtils.degToRad(beta);
+            const gammaRad = THREE.MathUtils.degToRad(gamma);
 
-            // Clamp beta
-            beta = Math.max(-85, Math.min(85, beta));
+            // Create rotation using device orientation
+            // Phone is typically held in portrait mode
+            const orient = window.orientation || 0;
 
-            targetRotation.x = THREE.MathUtils.degToRad(-beta);
-            targetRotation.y = THREE.MathUtils.degToRad(-alpha);
+            // Create quaternion from device orientation
+            const euler = new THREE.Euler();
+            const quaternion = new THREE.Quaternion();
+
+            // Set euler angles based on device orientation
+            // Beta = rotation around X (tilting phone forward/back)
+            // Gamma = rotation around Y (tilting phone left/right)  
+            // Alpha = rotation around Z (compass heading)
+
+            euler.set(
+                betaRad - Math.PI / 2,  // X: subtract 90° because phone is held upright
+                alphaRad,              // Y: compass heading
+                -gammaRad,             // Z: left/right tilt
+                'YXZ'                  // Rotation order
+            );
+
+            camera.quaternion.setFromEuler(euler);
+
+            // Update debug info
+            // document.getElementById('debug-info').textContent = 
+            //     `α:${alpha.toFixed(0)} β:${beta.toFixed(0)} γ:${gamma.toFixed(0)}`;
         }
 
-        // Request device orientation permission (iOS 13+)
-        async function requestOrientationPermission() {
+        // Enable motion tracking (called from button on iOS)
+        async function enableMotion() {
+            document.getElementById('orientation-prompt').classList.remove('visible');
+
             if (typeof DeviceOrientationEvent !== 'undefined' &&
                 typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
                     const permission = await DeviceOrientationEvent.requestPermission();
                     if (permission === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientation);
-                        return true;
+                        window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+                        orientationEnabled = true;
+                        console.log('iOS orientation enabled');
+                    } else {
+                        console.log('Orientation permission denied');
                     }
                 } catch (e) {
-                    console.log('Orientation permission error:', e);
+                    console.error('Orientation permission error:', e);
                 }
-                return false;
-            } else {
-                // Android or older iOS - just add listener
-                window.addEventListener('deviceorientation', handleOrientation);
-                return true;
             }
+        }
+
+        // Check if iOS needs permission prompt
+        function needsOrientationPermission() {
+            return typeof DeviceOrientationEvent !== 'undefined' &&
+                typeof DeviceOrientationEvent.requestPermission === 'function';
         }
 
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
 
-            // Smooth camera rotation
-            currentRotation.x += (targetRotation.x - currentRotation.x) * 0.1;
-            currentRotation.y += (targetRotation.y - currentRotation.y) * 0.1;
-
-            camera.rotation.x = currentRotation.x;
-            camera.rotation.y = currentRotation.y;
-
-            // Slow rotation for objects
+            // Slow rotation for objects (visual interest)
             if (objectsGroup) {
                 objectsGroup.children.forEach((obj, i) => {
-                    obj.rotation.y += 0.005 + (i * 0.001);
+                    obj.rotation.y += 0.003;
                 });
             }
 
@@ -452,7 +547,7 @@
                 console.error('Camera error:', err);
                 document.getElementById('error-message').textContent =
                     err.name === 'NotAllowedError'
-                        ? 'Camera access was denied. Please allow camera permissions and reload.'
+                        ? 'Camera access was denied. Please allow camera and reload.'
                         : 'Could not access camera: ' + err.message;
                 document.getElementById('error-screen').classList.add('visible');
                 document.getElementById('loading').classList.add('hidden');
@@ -462,13 +557,11 @@
 
         // Close viewer
         function closeViewer() {
-            // Stop camera
             const video = document.getElementById('camera-video');
             if (video.srcObject) {
                 video.srcObject.getTracks().forEach(t => t.stop());
             }
 
-            // Navigate back
             const baseUrl = window.location.href.split('ar-viewer')[0];
             window.location.href = baseUrl + 'index.html?group=' + groupId;
         }
@@ -477,7 +570,7 @@
         function hideHint() {
             setTimeout(() => {
                 document.getElementById('hint').classList.add('hidden');
-            }, 5000);
+            }, 6000);
         }
 
         // Initialize
@@ -492,23 +585,21 @@
             initThreeJS();
             createObjects();
 
-            // Request orientation permission and start
-            await requestOrientationPermission();
+            // Handle device orientation
+            if (needsOrientationPermission()) {
+                // iOS 13+ needs explicit permission via user gesture
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('orientation-prompt').classList.add('visible');
+            } else {
+                // Android - just add listener
+                window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+                orientationEnabled = true;
+                document.getElementById('loading').classList.add('hidden');
+            }
 
-            // Hide loading
-            document.getElementById('loading').classList.add('hidden');
             hideHint();
-
-            // Start render loop
             animate();
         });
-
-        // Touch to request orientation on iOS
-        document.body.addEventListener('touchstart', async () => {
-            if (initialAlpha === null) {
-                await requestOrientationPermission();
-            }
-        }, { once: true });
     </script>
 </body>
 
