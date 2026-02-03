@@ -6,9 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Viewer - Student Project</title>
 
-    <!-- A-Frame and AR.js for markerless AR -->
+    <!-- A-Frame for 3D rendering -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
     <style>
         * {
@@ -20,6 +19,32 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
+            background: #000;
+        }
+
+        /* Camera video background */
+        #camera-feed {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        /* A-Frame scene overlay */
+        #ar-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+
+        .a-canvas {
+            background: transparent !important;
         }
 
         /* Loading Overlay */
@@ -83,7 +108,8 @@
             z-index: 100;
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .ar-btn {
@@ -91,9 +117,9 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.3);
             color: white;
-            padding: 12px 24px;
+            padding: 12px 20px;
             border-radius: 25px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
@@ -107,6 +133,11 @@
         .ar-btn.primary {
             background: #667eea;
             border-color: #667eea;
+        }
+
+        .ar-btn.danger {
+            background: #e74c3c;
+            border-color: #e74c3c;
         }
 
         /* Info Panel */
@@ -176,20 +207,57 @@
             cursor: pointer;
         }
 
-        /* Fallback 3D View */
-        #fallback-container {
-            display: none;
-            width: 100%;
-            height: 100%;
+        /* Position controls */
+        #position-controls {
+            position: fixed;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
         }
 
-        #fallback-container.visible {
-            display: block;
+        .position-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        a-scene {
-            width: 100%;
-            height: 100%;
+        .position-btn:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Distance indicator */
+        #distance-indicator {
+            position: fixed;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 15px;
+            border-radius: 15px;
+            font-size: 11px;
+            z-index: 100;
+            text-align: center;
+        }
+
+        #distance-indicator .value {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 5px;
         }
     </style>
 </head>
@@ -198,59 +266,64 @@
     <!-- Loading Overlay -->
     <div id="loading-overlay">
         <div class="loading-spinner"></div>
-        <div class="loading-title">Initializing AR</div>
-        <div class="loading-subtitle">Point your camera at a flat surface to place the 3D objects</div>
+        <div class="loading-title">Starting AR Camera</div>
+        <div class="loading-subtitle">Please allow camera access when prompted</div>
     </div>
 
     <!-- Error Screen -->
     <div id="error-screen">
         <div class="error-icon">📱</div>
-        <div class="error-title">AR Not Available</div>
+        <div class="error-title">Camera Access Required</div>
         <div class="error-message">
-            Your device or browser doesn't support AR.
-            Try using Safari on iOS or Chrome on Android.
+            To view AR, please allow camera access and reload the page.
         </div>
-        <button class="error-btn" onclick="showFallbackView()">View in 3D Instead</button>
+        <button class="error-btn" onclick="location.reload()">🔄 Try Again</button>
     </div>
+
+    <!-- Camera Video Feed -->
+    <video id="camera-feed" autoplay playsinline></video>
 
     <!-- AR Scene Container -->
     <div id="ar-container">
-        <a-scene id="ar-scene" embedded
-            arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
-            vr-mode-ui="enabled: false" renderer="logarithmicDepthBuffer: true; antialias: true;" gesture-detector>
-            <!-- Camera -->
-            <a-camera gps-camera rotation-reader></a-camera>
+        <a-scene id="ar-scene" embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;"
+            background="color: transparent">
+            <!-- Camera - looking forward -->
+            <a-camera id="ar-camera" position="0 1.6 0" look-controls="enabled: false"
+                wasd-controls="enabled: false"></a-camera>
 
             <!-- Lights -->
-            <a-light type="ambient" intensity="1.0" color="#ffffff"></a-light>
-            <a-light type="directional" intensity="0.8" position="5 10 7" color="#ffffff"></a-light>
+            <a-light type="ambient" intensity="0.8" color="#ffffff"></a-light>
+            <a-light type="directional" intensity="0.6" position="1 2 1" color="#ffffff"></a-light>
 
-            <!-- Objects Container - objects will be added here dynamically -->
-            <a-entity id="ar-objects" position="0 0 -3" scale="0.5 0.5 0.5"></a-entity>
-        </a-scene>
-    </div>
-
-    <!-- Fallback 3D View (non-AR) -->
-    <div id="fallback-container">
-        <a-scene id="fallback-scene" embedded vr-mode-ui="enabled: false">
-            <a-camera position="0 2 5" look-controls wasd-controls></a-camera>
-            <a-light type="ambient" intensity="0.8"></a-light>
-            <a-light type="directional" position="2 4 3" intensity="0.6"></a-light>
-            <a-plane position="0 0 0" rotation="-90 0 0" width="10" height="10" color="#4a5580" opacity="0.5"></a-plane>
-            <a-entity id="fallback-objects"></a-entity>
+            <!-- Objects Container - will be positioned in front of camera -->
+            <a-entity id="ar-objects" position="0 1 -2" scale="0.4 0.4 0.4"></a-entity>
         </a-scene>
     </div>
 
     <!-- Info Panel -->
     <div id="info-panel">
-        <span id="object-count">0</span> objects loaded • Move phone to explore
+        <span id="object-count">0</span> objects • Move phone to look around
+    </div>
+
+    <!-- Position Controls -->
+    <div id="position-controls">
+        <button class="position-btn" onclick="moveObjects('up')" title="Move Up">⬆️</button>
+        <button class="position-btn" onclick="moveObjects('closer')" title="Move Closer">➕</button>
+        <button class="position-btn" onclick="moveObjects('further')" title="Move Further">➖</button>
+        <button class="position-btn" onclick="moveObjects('down')" title="Move Down">⬇️</button>
+    </div>
+
+    <!-- Distance Indicator -->
+    <div id="distance-indicator">
+        <div>Distance</div>
+        <div class="value" id="distance-value">2m</div>
     </div>
 
     <!-- AR Controls -->
     <div id="ar-controls">
         <button class="ar-btn" onclick="resetPosition()">🔄 Reset</button>
-        <button class="ar-btn" onclick="toggleScale()">📏 Resize</button>
-        <button class="ar-btn primary" onclick="window.close()">✕ Close</button>
+        <button class="ar-btn" onclick="cycleScale()">📏 Size: <span id="scale-label">Medium</span></button>
+        <button class="ar-btn primary" onclick="goBack()">← Back to Builder</button>
     </div>
 
     <script>
@@ -259,28 +332,99 @@
         const sceneParam = params.get('scene');
         const groupId = params.get('group') || '1';
         let sceneData = [];
-        let currentScale = 0.5;
+        let currentScale = 0.4;
+        let currentDistance = 2;
+        let currentHeight = 1;
         let arObjectsContainer;
+        let cameraStream = null;
 
-        // Check for AR support
-        function checkARSupport() {
-            // Check if on mobile
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        // Device orientation for AR
+        let deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
 
-            // Check for camera/getUserMedia support
-            const hasMediaDevices = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+        // Scale options
+        const scaleOptions = [
+            { value: 0.2, label: 'Small' },
+            { value: 0.4, label: 'Medium' },
+            { value: 0.7, label: 'Large' },
+            { value: 1.0, label: 'X-Large' }
+        ];
+        let currentScaleIndex = 1;
 
-            if (!isMobile) {
-                showError("AR works best on mobile devices. Please scan the QR code with your phone.");
+        // Start camera
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment', // Use back camera
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const videoElement = document.getElementById('camera-feed');
+                videoElement.srcObject = cameraStream;
+
+                // Wait for video to be ready
+                await new Promise((resolve) => {
+                    videoElement.onloadedmetadata = resolve;
+                });
+
+                console.log('Camera started successfully');
+                return true;
+            } catch (error) {
+                console.error('Camera error:', error);
+                showError('Could not access camera: ' + error.message);
                 return false;
             }
+        }
 
-            if (!hasMediaDevices) {
-                showError("Camera access is required for AR. Please allow camera permissions.");
-                return false;
+        // Start device orientation tracking
+        function startOrientationTracking() {
+            if (typeof DeviceOrientationEvent !== 'undefined') {
+                // iOS 13+ requires permission
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    // We'll request this on first touch
+                    document.body.addEventListener('touchstart', requestOrientationPermission, { once: true });
+                } else {
+                    // Android and older iOS
+                    window.addEventListener('deviceorientation', handleOrientation);
+                }
             }
+        }
 
-            return true;
+        async function requestOrientationPermission() {
+            try {
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                }
+            } catch (e) {
+                console.log('Orientation permission not needed or denied');
+            }
+        }
+
+        function handleOrientation(event) {
+            deviceOrientation = {
+                alpha: event.alpha || 0,
+                beta: event.beta || 0,
+                gamma: event.gamma || 0
+            };
+
+            // Update camera rotation based on device orientation
+            const camera = document.getElementById('ar-camera');
+            if (camera) {
+                // Convert device orientation to camera rotation
+                // Beta = tilt front/back (-180 to 180)
+                // Gamma = tilt left/right (-90 to 90)
+                // Alpha = compass direction (0 to 360)
+
+                const x = deviceOrientation.beta - 90; // Adjust for holding phone upright
+                const y = deviceOrientation.alpha;
+                const z = -deviceOrientation.gamma;
+
+                camera.setAttribute('rotation', `${x} ${y} ${z}`);
+            }
         }
 
         function showError(message) {
@@ -289,21 +433,13 @@
             document.querySelector('.error-message').textContent = message;
         }
 
-        function showFallbackView() {
-            document.getElementById('error-screen').classList.remove('visible');
-            document.getElementById('ar-container').style.display = 'none';
-            document.getElementById('fallback-container').classList.add('visible');
-            loadObjectsIntoContainer(document.getElementById('fallback-objects'));
-        }
-
         // Load scene data from URL
         function loadSceneData() {
             if (!sceneParam) {
-                console.log('No scene data in URL');
-                // Create demo objects if no scene data
+                console.log('No scene data in URL, using demo objects');
                 sceneData = [
-                    { type: 'box', color: '#e74c3c', position: { x: 0, y: 1, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
-                    { type: 'sphere', color: '#3498db', position: { x: 1.5, y: 1, z: 0 }, scale: { x: 1, y: 1, z: 1 } }
+                    { type: 'box', color: '#e74c3c', position: { x: 0, y: 0.5, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+                    { type: 'sphere', color: '#3498db', position: { x: 1.5, y: 0.5, z: 0 }, scale: { x: 1, y: 1, z: 1 } }
                 ];
                 return;
             }
@@ -325,7 +461,7 @@
                 const entity = document.createElement('a-entity');
                 entity.id = `ar-obj-${index}`;
 
-                const pos = obj.position || { x: 0, y: 1, z: 0 };
+                const pos = obj.position || { x: 0, y: 0.5, z: 0 };
                 entity.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
 
                 // Set geometry based on type
@@ -341,16 +477,32 @@
                 } else if (obj.type === 'cone') {
                     geomAttrs.height = 1;
                     geomAttrs.radiusBottom = 0.5;
-                    geomAttrs.radiusTop = 0.1;
+                    geomAttrs.radiusTop = 0.05;
                 } else if (obj.type === 'dodecahedron') {
                     geomAttrs.radius = 0.5;
+                } else if (obj.type === 'plane') {
+                    geomAttrs.width = 1;
+                    geomAttrs.height = 1;
                 }
 
                 entity.setAttribute('geometry', geomAttrs);
-                entity.setAttribute('material', { color: obj.color || '#ffffff' });
+                entity.setAttribute('material', {
+                    color: obj.color || '#ffffff',
+                    metalness: 0.1,
+                    roughness: 0.8
+                });
 
                 const scale = obj.scale || { x: 1, y: 1, z: 1 };
                 entity.setAttribute('scale', `${scale.x} ${scale.y} ${scale.z}`);
+
+                // Add slight animation for visual interest
+                entity.setAttribute('animation', {
+                    property: 'rotation',
+                    to: '0 360 0',
+                    loop: true,
+                    dur: 10000 + (index * 1000),
+                    easing: 'linear'
+                });
 
                 container.appendChild(entity);
             });
@@ -358,34 +510,81 @@
             document.getElementById('object-count').textContent = sceneData.length;
         }
 
-        // Reset position of AR objects
-        function resetPosition() {
-            if (arObjectsContainer) {
-                arObjectsContainer.setAttribute('position', '0 0 -3');
-                arObjectsContainer.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+        // Move objects
+        function moveObjects(direction) {
+            if (!arObjectsContainer) return;
+
+            const currentPos = arObjectsContainer.getAttribute('position');
+
+            switch (direction) {
+                case 'up':
+                    currentHeight = Math.min(currentHeight + 0.3, 3);
+                    break;
+                case 'down':
+                    currentHeight = Math.max(currentHeight - 0.3, 0);
+                    break;
+                case 'closer':
+                    currentDistance = Math.max(currentDistance - 0.5, 0.5);
+                    break;
+                case 'further':
+                    currentDistance = Math.min(currentDistance + 0.5, 10);
+                    break;
             }
+
+            arObjectsContainer.setAttribute('position', `0 ${currentHeight} ${-currentDistance}`);
+            document.getElementById('distance-value').textContent = currentDistance.toFixed(1) + 'm';
         }
 
-        // Toggle scale of AR objects
-        function toggleScale() {
-            const scales = [0.3, 0.5, 0.75, 1.0];
-            const currentIndex = scales.indexOf(currentScale);
-            const nextIndex = (currentIndex + 1) % scales.length;
-            currentScale = scales[nextIndex];
+        // Reset position
+        function resetPosition() {
+            currentDistance = 2;
+            currentHeight = 1;
+            currentScaleIndex = 1;
+            currentScale = scaleOptions[currentScaleIndex].value;
+
+            if (arObjectsContainer) {
+                arObjectsContainer.setAttribute('position', `0 ${currentHeight} ${-currentDistance}`);
+                arObjectsContainer.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+            }
+
+            document.getElementById('distance-value').textContent = currentDistance.toFixed(1) + 'm';
+            document.getElementById('scale-label').textContent = scaleOptions[currentScaleIndex].label;
+        }
+
+        // Cycle through scale options
+        function cycleScale() {
+            currentScaleIndex = (currentScaleIndex + 1) % scaleOptions.length;
+            currentScale = scaleOptions[currentScaleIndex].value;
 
             if (arObjectsContainer) {
                 arObjectsContainer.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+            }
+
+            document.getElementById('scale-label').textContent = scaleOptions[currentScaleIndex].label;
+        }
+
+        // Go back to builder
+        function goBack() {
+            // Try to go back, or redirect to main page
+            if (document.referrer && document.referrer.includes('student-ar-builder')) {
+                window.history.back();
+            } else {
+                window.location.href = window.location.href.replace('ar-viewer.html', 'index.html').split('?')[0] + '?group=' + groupId;
             }
         }
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             loadSceneData();
 
-            // Check AR support
-            if (!checkARSupport()) {
+            // Start camera first
+            const cameraStarted = await startCamera();
+            if (!cameraStarted) {
                 return;
             }
+
+            // Start orientation tracking
+            startOrientationTracking();
 
             // Wait for A-Frame scene to load
             const arScene = document.getElementById('ar-scene');
@@ -393,29 +592,19 @@
                 arObjectsContainer = document.getElementById('ar-objects');
                 loadObjectsIntoContainer(arObjectsContainer);
 
-                // Hide loading overlay after a short delay
+                // Hide loading overlay
                 setTimeout(() => {
                     document.getElementById('loading-overlay').classList.add('hidden');
-                }, 1500);
-            });
-
-            // Handle camera errors
-            arScene.addEventListener('camera-error', () => {
-                showError("Could not access camera. Please check permissions and try again.");
+                }, 500);
             });
         });
 
-        // Request camera permission explicitly for iOS
-        async function requestCameraPermission() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                stream.getTracks().forEach(track => track.stop());
-                return true;
-            } catch (e) {
-                console.error('Camera permission denied:', e);
-                return false;
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
             }
-        }
+        });
     </script>
 </body>
 
