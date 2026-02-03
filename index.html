@@ -568,6 +568,24 @@
         let isEditMode = false;
         let persistentSelectedObject = null; // For tracking selection outside of drag
 
+        // Helper function to convert mouse coordinates relative to the A-Frame canvas
+        function getMouseNDC(event) {
+            const canvas = document.querySelector('.a-canvas');
+            if (!canvas) {
+                // Fallback to window coordinates
+                return {
+                    x: (event.clientX / window.innerWidth) * 2 - 1,
+                    y: -(event.clientY / window.innerHeight) * 2 + 1
+                };
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                y: -((event.clientY - rect.top) / rect.height) * 2 + 1
+            };
+        }
+
         // Helper function to enable/disable camera controls
         function setCameraControlsEnabled(enabled) {
             if (!cameraEl) return;
@@ -720,8 +738,9 @@
             const camera = scene.camera;
             if (!camera) return;
 
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            const ndc = getMouseNDC(event);
+            mouse.x = ndc.x;
+            mouse.y = ndc.y;
 
             raycaster.setFromCamera(mouse, camera);
 
@@ -803,8 +822,9 @@
             const camera = scene.camera;
             if (!camera) return;
 
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            const ndc = getMouseNDC(event);
+            mouse.x = ndc.x;
+            mouse.y = ndc.y;
 
             const pos = selectedObject.getAttribute('position');
 
